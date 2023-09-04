@@ -7,23 +7,28 @@
 2.增加新的功能，⽐如 –v/--verbose 参数输出所有遍历到的⽂件
 3.同时⽀持匹配多个正则
 4.给输出结果去重排序
-5.⽀持命令⾏彩⾊输出
+5.⽀持同时搜索多个path
+6.⽀持命令⾏彩⾊输出
+
 */
 
 extern crate colored;
 
+use colored::*;
 use regex::Regex;
 use std::env;
 use std::process;
-use colored::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     // 参数 1：搜索目录；参数 2：要搜索的正则表达式。
     if args.len() < 3 {
-        eprintln!("{} {} {}" , "使用方式: ".yellow(), args[0].yellow(), "<目标目录> <要搜索的正则表达式> <要搜索的正则表达式>...".yellow());
-        eprintln!("{}" , "或者将“<要搜索的正则表达式>”部分改为“–v/--verbose”以输出所有遍历到的⽂件".yellow());
+        eprintln!("{} {} {}" , "使用方式: ".yellow(), args[0].yellow(), "dir,<目标目录> <要搜索的正则表达式> <要搜索的正则表达式>...dir,<目标目录> <要搜索的正则表达式> <要搜索的正则表达式>...".yellow());
+        eprintln!(
+            "{}",
+            "或者将“<要搜索的正则表达式>”部分改为“–v/--verbose”以输出所有遍历到的⽂件".yellow()
+        );
         process::exit(1);
     }
 
@@ -31,45 +36,53 @@ fn main() {
     //答：在这里采用多条件“或”的方式
 
     //用循环处理所有正则表达式
-    let mut counter = 2;
-    let mut all: Vec<String> = Vec::new();
 
+    let mut all: Vec<String> = Vec::new();
+    let mut outcnt = 1;
     loop {
-        if counter >= args.len() {
+        if outcnt >= args.len() {
             break;
         }
-        eprintln!("\n正在处理正则表达式[{}]...", counter - 1);
-        let pattern = &args[counter];
-        counter += 1;
-        let regex = match Regex::new(pattern) {
-            Ok(re) => re,
-            Err(err) => {
-                eprintln!("无效的正则表达式'{}':{}", pattern, err);
-                process::exit(1);
+        let dir = &args[outcnt][4..];
+        let mut counter = 1;
+        loop {
+            outcnt += 1;
+            if outcnt >= args.len() || (args[outcnt].len() > 4 && &args[outcnt][..4] == "dir,") {
+                break;
             }
-        };
+            eprintln!("\n正在处理该目录下的正则表达式[{}]...", counter);
+            let pattern = &args[outcnt];
+            counter += 1;
+            let regex = match Regex::new(pattern) {
+                Ok(re) => re,
+                Err(err) => {
+                    eprintln!("无效的正则表达式'{}':{}", pattern, err);
+                    process::exit(1);
+                }
+            };
 
-        match find_mod::find(&args[1], &regex) {
-            Ok(matches) => {
-                if matches.is_empty() {
-                    println!("{}", "未找到匹配项。".yellow());
-                } else {
-                    let mut temp: Vec<String> = matches.clone();
-                    all.append(&mut temp);
-                    println!("{}", "找到以下匹配项：".green());
-                    for file in matches {
-                        println!("{}", file.blue());
+            match find_mod::find(dir, &regex) {
+                Ok(matches) => {
+                    if matches.is_empty() {
+                        println!("{}", "未找到匹配项。".yellow());
+                    } else {
+                        let mut temp: Vec<String> = matches.clone();
+                        all.append(&mut temp);
+                        println!("{}", "找到以下匹配项：".green());
+                        for file in matches {
+                            println!("{}", file.blue());
+                        }
                     }
                 }
-            }
-            Err(error) => {
-                eprintln!("{} {}","发生错误：".red(), error);
-                process::exit(1);
+                Err(error) => {
+                    eprintln!("{} {}", "发生错误：".red(), error);
+                    process::exit(1);
+                }
             }
         }
     }
 
-    if !all.is_empty(){
+    if !all.is_empty() {
         all.sort();
         all.dedup();
         println!("\n\n合并、去重、排序后的匹配项如下：");
@@ -77,7 +90,6 @@ fn main() {
             println!("{}", file.blue());
         }
     }
-    
 }
 
 mod find_mod {
