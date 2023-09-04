@@ -1,6 +1,9 @@
 # myfind-rust
 For the assignment1
 
+3210103818
+杨朗骐
+
 实现如下：
 1.将该代码重构到多个模块中
 2.增加新的功能，⽐如 –v/--verbose 参数输出所有遍历到的⽂件
